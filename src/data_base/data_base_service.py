@@ -28,19 +28,25 @@ class DataBaseService:
         """Удаляет таблицы. Если модели не переданы, удаляет все таблицы."""
         self._apply_to_tables(models, "drop")
 
-    def _apply_to_tables(self, models, action: str) -> None:
-        actions = {"create": lambda model_obj: model_obj.metadata.create_all(self.engine),
-                   "drop": lambda model_obj: model_obj.metadata.drop_all(self.engine),
-                   }
-        if action not in actions:
+    def _apply_to_tables(self, models: Union[Type[DeclarativeMeta], list[Type[DeclarativeMeta]], None], action: str) -> None:
+        action_type = {
+            "create": lambda model_obj, model_tables: model_obj.metadata.create_all(bind=self.engine, tables=model_tables),
+            "drop": lambda model_obj, model_tables: model_obj.metadata.drop_all(bind=self.engine, tables=model_tables),
+        }
+
+
+        if action not in action_type:
             raise ValueError(f"Неизвестное действие: {action}")
 
         models = [self.base_model] if models is None else ([models] if isinstance(models, type) else models)
 
         for model in models:
+            model_tables = None
             if not isinstance(model, type) or not issubclass(model, self.base_model):
                 raise TypeError(f"Неверный тип модели: {model}")
-            actions[action](model)
+            if hasattr(model, "__table__"):
+                model_tables = [model.__table__]
+            action_type[action](model, model_tables)
 
     @contextmanager
     def session_scope(self):
