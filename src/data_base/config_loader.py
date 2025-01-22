@@ -20,8 +20,6 @@ def load_config(database_type: DataBaseType, config_path:str = None) -> DataBase
     if database_type.value not in config:
         raise ValueError(f"Секция '{database_type.value}' не найдена в конфигурационном файле: {config_path}")
 
-    if DataBaseType.URL.value not in config[database_type.value]:
-        raise ValueError(f"Ключ '{DataBaseType.URL.value}' отсутствует в секции '{database_type.value}'")
-
-    url = config[database_type.value][DataBaseType.URL.value]
-    return DataBaseConfig(url)
+    conf_keys = config[database_type.value]
+    kwargs = {k: conf_keys[k] for k in conf_keys}
+    return DataBaseConfig(**kwargs)
