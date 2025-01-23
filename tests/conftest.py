@@ -4,7 +4,7 @@ from src.data_base.configuration.config import DataBaseConfig
 from src.data_base.data_base_service import DataBaseService
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def db():
     """фикстура для тестового сервиса базы данных."""
     test_db_config = DataBaseConfig(url="sqlite:///:memory:")
