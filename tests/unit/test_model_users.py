@@ -36,11 +36,12 @@ class TestUsersCRUDCreate:
     )
     def test_create(self, setup_users_table, users_data, expected_count):
         """
-        Эта тестовая функция проверяет создание записей пользователей в базе данных с использованием BaseCRUDService.
+        Тестирует создание пользователей в базе данных.
 
-        Parameters:
-        - users_data: Список словарей, представляющих данные пользователей. Каждый словарь должен содержать ключи "nickname", "name" и "surname".
-        - expected_count: Целое число, представляющее ожидаемое количество записей в базе данных после процесса создания.
+        :param setup_users_table: Фикстура для инициализации таблицы пользователей.
+        :param users_data: Список данных пользователей для создания записей в таблице.
+        :param expected_count: Ожидаемое количество записей в таблице после создания.
+        :raises AssertionError: Если количество созданных записей или данные создаваемых пользователей не соответствуют ожидаемым.
         """
         with setup_users_table.session_scope() as session:
             base_serv = BaseCRUDService(session, Users)
