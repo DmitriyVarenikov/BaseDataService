@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 from typing import Type, Union
-
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -10,7 +9,16 @@ from .model import BaseModel
 
 
 class DataBaseService:
+    """
+    Класс DataBaseService предоставляет методы для работы с базой данных, включая создание таблиц,
+     удаление таблиц и управление сессиями.
+    """
+
     def __init__(self, database_config: DataBaseConfig):
+        """
+        :param database_config: Конфигурация базы данных.
+        :raises RuntimeError: Возникает, если не удалось инициализировать сервис базы данных.
+        """
         try:
             self.conf = database_config
             self.engine = create_engine(self.conf.url, echo=self.conf.echo)
@@ -21,19 +29,27 @@ class DataBaseService:
             raise RuntimeError(f"Не удалось инициализировать DataBaseService: {ex}")
 
     def create_tables(self, models: Union[Type[DeclarativeMeta], list[Type[DeclarativeMeta]], None] = None) -> None:
-        """Создаёт все таблицы, если их ещё нет."""
+        """
+        Создает таблицы в базе данных для указанных моделей.
+        """
         self._apply_to_tables(models, "create")
 
     def drop_tables(self, models: Union[Type[DeclarativeMeta], list[Type[DeclarativeMeta]], None] = None) -> None:
-        """Удаляет таблицы. Если модели не переданы, удаляет все таблицы."""
+        """
+        Удаляет таблицы из базы данных.
+        """
         self._apply_to_tables(models, "drop")
 
-    def _apply_to_tables(self, models: Union[Type[DeclarativeMeta], list[Type[DeclarativeMeta]], None], action: str) -> None:
+    def _apply_to_tables(self, models: Union[Type[DeclarativeMeta], list[Type[DeclarativeMeta]], None],
+                         action: str) -> None:
+        """
+        Применяет указанное действие к таблицам моделей.
+        """
         action_type = {
-            "create": lambda model_obj, model_tables: model_obj.metadata.create_all(bind=self.engine, tables=model_tables),
+            "create": lambda model_obj, model_tables: model_obj.metadata.create_all(bind=self.engine,
+                                                                                    tables=model_tables),
             "drop": lambda model_obj, model_tables: model_obj.metadata.drop_all(bind=self.engine, tables=model_tables),
         }
-
 
         if action not in action_type:
             raise ValueError(f"Неизвестное действие: {action}")
@@ -50,7 +66,9 @@ class DataBaseService:
 
     @contextmanager
     def session_scope(self):
-        """контекстный менеджер сессии"""
+        """
+        Создает контекстный менеджер для управления сессией базы данных.
+        """
         session = self.session_local()
         try:
             yield session
