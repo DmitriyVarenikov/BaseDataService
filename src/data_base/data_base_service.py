@@ -65,14 +65,18 @@ class DataBaseService:
             action_type[action](model, model_tables)
 
     @contextmanager
-    def session_scope(self):
+    def session_scope(self, commit=True):
         """
-        Создает контекстный менеджер для управления сессией базы данных.
+        Предоставляет контекстный менеджер для управления сессией базы данных.
+
+        :param commit: Указывает, следует ли выполнять commit изменений в сессии. По умолчанию True.
+        :raises Exception: Выбрасывается в случае ошибки выполнения в сессии, с последующим откатом изменений.
         """
         session = self.session_local()
         try:
             yield session
-            session.commit()
+            if commit:
+                session.commit()
         except Exception as e:
             session.rollback()
             print(f"Session rollback due to: {e}")
