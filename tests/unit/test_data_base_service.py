@@ -1,9 +1,7 @@
 import pytest
 from sqlalchemy import inspect
-from contextlib import nullcontext
 
-from src.data_base.model import Users, Reminders
-
+from ..data.data_base_service import parametrize_create_tables_with_specific_models
 
 
 class TestDataBaseService:
@@ -36,13 +34,7 @@ class TestDataBaseService:
         assert "users" not in tables, "Таблица 'users' не была удалена"
         assert "reminders" not in tables, "Таблица 'reminders' не была удалена"
 
-    @pytest.mark.parametrize("models, excepted_tables, contex", [
-        (Users, "users", nullcontext()),
-        (Reminders, "reminders", nullcontext()),
-        ([Users, Reminders], ["users", "reminders"], nullcontext()),
-        (None, ["users", "reminders"], nullcontext()),
-        ("...", ["users", "reminders"], pytest.raises(TypeError))
-    ])
+    @pytest.mark.parametrize("models, excepted_tables, contex", parametrize_create_tables_with_specific_models)
     def test_create_tables_with_specific_models(self, db, models, excepted_tables, contex):
         """
         Тестирует создание таблиц на основе указанных моделей.
