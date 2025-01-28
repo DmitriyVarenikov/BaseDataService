@@ -14,31 +14,24 @@ from ..data.data_model_users import parametrize_create, parametrize_duplicate_na
 # Обработку транзакций и откатов (rollback). +
 
 @pytest.fixture
-def setup_users_table(db):
+def setup_users_table(table_manager):
     """Фикстура для создания таблицы Users на чистой базе."""
-    db.drop_tables()
-    db.create_tables(Users)
-    yield db
+    table_manager.drop_tables()
+    table_manager.create_tables(Users)
 
 
-@pytest.fixture
-def db_session(setup_users_table):
-    """
-    Создает фикстуру для сессии базы данных.
-
-    Для тестов коммит внутри сессии отключен.
-
-    :param setup_users_table: Фикстура для настройки таблицы пользователей.
-    """
-    with setup_users_table.session_scope(commit=False) as session:
-        yield session
-
-
+@pytest.mark.usefixtures("setup_users_table")
 class TestUsersCRUDCreate:
 
     @pytest.mark.parametrize(
         "users_data, expected_count", parametrize_create)
     def test_create(self, db_session, users_data, expected_count):
+        """
+        Тестирует создание пользователей с использованием сервиса BaseCRUDService.
+
+        :param users_data: Данные пользователей для создания.
+        :param expected_count: Ожидаемое количество созданных пользователей.
+        """
         base_serv = BaseCRUDService(db_session, Users)
         for user_data in users_data:
             new_users = base_serv.create(**user_data)
@@ -62,9 +55,9 @@ class TestUsersCRUDCreate:
     @pytest.mark.parametrize("users_data", parametrize_duplicate_name)
     def test_create_duplicate_nickname(self, db_session, users_data):
         """
-        Тест проверяет создание записи пользователя с дублирующимся никнеймом.
+        Тест проверяет возможность создания дубликата никнейма пользователя.
 
-        :param users_data: Данные пользователей, включающие оригинальный и дублирующийся никнейм.
+        :param users_data: Данные о пользователях, где один из записей содержит дублирующийся никнейм.
         """
         base_serv = BaseCRUDService(db_session, Users)
         base_serv.create(**users_data[0])
@@ -83,10 +76,10 @@ class TestUsersCRUDCreate:
     @pytest.mark.parametrize("users_data", parametrize_invalid_user_data)
     def test_invalid_user_data(self, db_session, users_data):
         """
-        Тест проверяет обработку некорректных данных пользователей и выбрасывание исключений.
+        Тест проверяет обработку недопустимых данных пользователей и гарантирует возникновение исключения при попытке их добавления в базу данных.
 
-        :param db_session: Сессия базы данных.
-        :param users_data: Набор данных с некорректной информацией о пользователях.
+        :param db_session: Текущая сессия базы данных.
+        :param users_data: Набор данных пользователей, которые считаются недопустимыми.
         """
         base_serv = BaseCRUDService(db_session, Users)
         for user_data in users_data:
