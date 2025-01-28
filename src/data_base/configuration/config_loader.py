@@ -1,11 +1,15 @@
 import configparser
 from enum import Enum
 
-from .configuration.config import DataBaseConfig
-from .types_db import DataBaseType
-from .configuration.constrains import CONFIG_FILE
+from src.data_base.configuration.config import DataBaseConfig
+from src.data_base.configuration.constrains import CONFIG_FILE
 
 
+class DataBaseType(Enum):
+    SQLite = "sqlite"
+    SQLite_test = "sqlite_test"
+    PostgreSQL = "postgresql"
+    URL = "url"
 
 def load_config(database_type: DataBaseType, config_path:str = None) -> DataBaseConfig:
 
