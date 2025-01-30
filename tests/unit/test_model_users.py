@@ -4,7 +4,8 @@ from sqlalchemy.exc import IntegrityError
 
 from src.data_base.model import Users
 from src.data_base.service_model.base_service import BaseCRUDService
-from ..data.data_model_users import parametrize_create, parametrize_duplicate_name, parametrize_invalid_user_data
+from ..data.data_model_users import parametrize_create, parametrize_duplicate_name, parametrize_invalid_user_data, \
+    parametrize_filter_single_field, parametrize_with_filter_multiple_fields
 
 
 # Успешное создание записи. Создание нескольких объектов. +
@@ -87,3 +88,115 @@ class TestUsersCRUDCreate:
                 base_serv.create(**user_data)
                 db_session.flush()
             db_session.rollback()
+
+
+#  Чтение всех записей в таблице. +
+#  Чтение записей по одному полю (фильтрация).
+#  Чтение записей по нескольким полям (сложная фильтрация).
+#  Чтение записей с сортировкой по одному полю.
+#  Чтение записей с сортировкой по нескольким полям.
+#  Чтение записей с лимитом (ограничение количества).
+#  Чтение записей с оффсетом (пагинация).
+#  Чтение записей с комбинацией фильтрации, сортировки и лимита.
+#  Чтение записей, когда в таблице нет данных.
+#  Чтение записей, когда фильтр не соответствует ни одной записи.
+
+
+@pytest.mark.usefixtures("setup_users_table")
+class TestUsersCRUDRead:
+
+    @pytest.mark.parametrize("users_data, expected_count", parametrize_create)
+    def test_all(self, db_session, users_data, expected_count):
+        """
+        Тестирует метод создания и чтения пользователей, проверяя их количество и тип.
+
+        :param db_session: Сессия базы данных.
+        :param users_data: Данные пользователей для создания.
+        :param expected_count: Ожидаемое количество созданных пользователей.
+        :raises AssertionError: Если количество пользователей или их тип не соответствует ожидаемому.
+        """
+        base_serv = BaseCRUDService(db_session, Users)
+        for user_data in users_data:
+            base_serv.create(**user_data)
+
+        db_session.flush()
+
+        users = base_serv.read()
+
+        assert len(users) == expected_count
+        assert all(isinstance(user, Users) for user in users)
+
+    @pytest.mark.parametrize("users_data, filter_field, expected_count", parametrize_filter_single_field)
+    def test_with_filter_single_field(self, db_session, users_data, filter_field, expected_count):
+        """
+        Тест проверяет корректность фильтрации записей по одному полю.
+
+        :param users_data: Данные пользователей, передаваемые для записи в базу.
+        :param filter_field: Фильтр для выборки записей.
+        :param expected_count: Ожидаемое количество записей после применения фильтра.
+        """
+        base_serv = BaseCRUDService(db_session, Users)
+        for user_data in users_data:
+            base_serv.create(**user_data)
+
+        db_session.flush()
+
+        filters = [getattr(Users, key) == value for key, value in filter_field.items()]
+
+        users = base_serv.read(filters=filters)
+        assert len(users) == expected_count, f"Ожидалось {expected_count} записей, получено {len(users)}"
+
+        if expected_count == 0:
+            assert users == [], f"Метод read() должен вернуть пустой список, но вернул {users}"
+            return
+
+        # Проверяем, что у всех найденных пользователей значение соответствует фильтру
+        key, value = next(iter(filter_field.items()))
+        for user in users:
+            assert getattr(user, key) == value, f"Значение {key} в {user} не совпадает с {value}"
+
+    @pytest.mark.parametrize("users_data, filter_field, expected_count", parametrize_with_filter_multiple_fields)
+    def test_with_filter_multiple_fields(self, db_session, users_data, filter_field, expected_count):
+        base_serv = BaseCRUDService(db_session, Users)
+        for user_data in users_data:
+            base_serv.create(**user_data)
+
+        db_session.flush()
+
+        filters = [getattr(Users, key) == value for key, value in filter_field.items()]
+
+        users = base_serv.read(filters=filters)
+        assert len(users) == expected_count, f"Ожидалось {expected_count} записей, получено {len(users)}"
+
+        if expected_count == 0:
+            assert users == [], f"Метод read() должен вернуть пустой список, но вернул {users}"
+            return
+
+        # Проверяем, что у всех найденных пользователей значение соответствует фильтру
+        for user in users:
+            for key, value in filter_field.items():
+                assert getattr(user, key) == value, f"Значение {key} в {user} не совпадает с {value}"
+
+    def test_with_sorted_single_field(self, db_session):
+        pass
+
+    def test_with_sorted_any_field(self, db_session):
+        pass
+
+    def test_with_limit(self, db_session):
+        pass
+
+    def test_with_offset(self, db_session):
+        pass
+
+    def test_with_filter_sorted_limit(self, db_session):
+        pass
+
+    def test_empty_table(self):
+        pass
+
+    def test_filter_not_found(self):
+        pass
+
+    def test_read_filter_no_results(self):
+        pass

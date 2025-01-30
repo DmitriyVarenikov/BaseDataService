@@ -23,6 +23,59 @@ parametrize_invalid_user_data = [
         {"nickname": "test", "name": "", "surname": "Doe"},  # пустой name
         {"nickname": "test", "name": "John", "surname": ""},  # пустой surname
         {"nickname": "test", "name": "John", "surname": None},  # surname = None
-        {} # пустой case
+        {}  # пустой case
     ],
+]
+
+parametrize_filter_single_field = [
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"nickname": "user2"}, 1),
+
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"name": "Мария"}, 1),
+
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"surname": "Иванов"}, 1),
+
+    ([
+        {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+        {"nickname": "user2", "name": "Иван", "surname": "Петров"},
+        {"nickname": "user3", "name": "Иван", "surname": "Петров"}
+    ], {"name": "Иван"}, 3),
+
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Иван", "surname": "Петров"},
+         {"nickname": "user3", "name": "Иван", "surname": "Петров"}
+     ], {"name": "Empty"}, 0),
+
+]
+
+parametrize_with_filter_multiple_fields = [
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"nickname": "user2", "name": "Алексей"}, 1),
+
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"name": "Мария", "surname": "Empty", }, 0),
+
+    ([
+         {"nickname": "user1", "name": "Иван", "surname": "Иванов"},
+         {"nickname": "user2", "name": "Алексей", "surname": "Петров"},
+         {"nickname": "user3", "name": "Мария", "surname": "Сидорова"}
+     ], {"name": "Мария", "surname": "Empty", }, 0),
 ]
