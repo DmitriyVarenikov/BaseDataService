@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from typing import Type, TypeVar, Generic
+from typing import Type, TypeVar, Generic, Optional, Any
 
 from src.data_base.model.base_model import BaseModel
+from sqlalchemy import and_, or_
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -54,21 +55,25 @@ class BaseCRUDService(Generic[T]):
         updated_count = query.update(updates, synchronize_session="fetch")
         return updated_count
 
-    def read(self, filters: dict = None, order_by=None, limit: int = None, offset: int = None) -> list[T]:
+    def read(self,
+             filters: Optional[list[Any]] = None,
+             use_or: bool = False,
+             order_by=None,
+             limit: int = None,
+             offset: int = None) -> list[T]:
         """
-        Чтение записей из базы данных на основе фильтров и параметров.
+        Читает данные из базы данных на основе заданных фильтров и параметров сортировки.
 
-        :param filters: Словарь с условиями для фильтрации записей (опционально).
-        :param order_by: Поле или список полей для сортировки (опционально).
-        :param limit: Ограничение на количество возвращаемых записей (опционально).
-        :param offset: Смещение для пагинации (опционально).
-        :return: Список объектов модели.
+        :param filters: Список фильтров для применения к запросу.
+        :param use_or: Логическое значение, определяющее использование логического "ИЛИ" вместо "И" для фильтров.
+        :param order_by: Поле или список полей для сортировки результатов.
+        :param limit: Максимальное количество возвращаемых записей.
+        :param offset: Смещение количества пропускаемых записей от начала.
         """
-
         query = self._session.query(self._model)
 
         if filters:
-            query = query.filter_by(**filters)
+            query = query.filter(or_(*filters) if use_or else and_(*filters))
 
         if order_by:
             if isinstance(order_by, list):
