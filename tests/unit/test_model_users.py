@@ -1,11 +1,16 @@
+from dataclasses import field
+
 import pytest
 
+from sqlalchemy import text, asc, desc
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.testing.suite import PrecisionIntervalTest
 
 from src.data_base.model import Users
 from src.data_base.service_model.base_service import BaseCRUDService
 from ..data.data_model_users import parametrize_create, parametrize_duplicate_name, parametrize_invalid_user_data, \
-    parametrize_filter_single_field, parametrize_with_filter_multiple_fields
+    parametrize_filter_single_field, parametrize_with_filter_multiple_fields, parametrize_with_sorted_single_field, \
+    parametrize_sorting_by_multiple_fields, parametrize_create_valid, parametrize_with_filter_sorted_limit
 
 
 # Успешное создание записи. Создание нескольких объектов. +
@@ -91,15 +96,23 @@ class TestUsersCRUDCreate:
 
 
 #  Чтение всех записей в таблице. +
-#  Чтение записей по одному полю (фильтрация).
-#  Чтение записей по нескольким полям (сложная фильтрация).
-#  Чтение записей с сортировкой по одному полю.
-#  Чтение записей с сортировкой по нескольким полям.
-#  Чтение записей с лимитом (ограничение количества).
-#  Чтение записей с оффсетом (пагинация).
-#  Чтение записей с комбинацией фильтрации, сортировки и лимита.
-#  Чтение записей, когда в таблице нет данных.
-#  Чтение записей, когда фильтр не соответствует ни одной записи.
+#  Чтение записей, когда в таблице нет данных. +
+#  Чтение записей по одному полю (фильтрация). +
+#  Чтение записей по нескольким полям (сложная фильтрация). +
+#  Чтение записей, когда фильтр не соответствует ни одной записи. +
+#  Чтение записей с сортировкой по одному полю. +
+#  Чтение записей с сортировкой по нескольким полям. +
+#  Чтение записей с лимитом (ограничение количества). +
+#  Чтение записей с оффсетом. +
+#  Чтение записей с комбинацией фильтрации, сортировки и лимита. +
+
+
+def _create_users(db_session, users_data):
+    base_serv = BaseCRUDService(db_session, Users)
+    for user_data in users_data:
+        base_serv.create(**user_data)
+    db_session.flush()
+    return base_serv
 
 
 @pytest.mark.usefixtures("setup_users_table")
@@ -108,23 +121,21 @@ class TestUsersCRUDRead:
     @pytest.mark.parametrize("users_data, expected_count", parametrize_create)
     def test_all(self, db_session, users_data, expected_count):
         """
-        Тестирует метод создания и чтения пользователей, проверяя их количество и тип.
+        Тестирует создание пользователей и проверяет общее количество созданных записей, а также корректность данных.
 
-        :param db_session: Сессия базы данных.
-        :param users_data: Данные пользователей для создания.
+        :param db_session: Текущая сессия базы данных для выполнения операций.
+        :param users_data: Данные пользователей, используемые для тестирования.
         :param expected_count: Ожидаемое количество созданных пользователей.
-        :raises AssertionError: Если количество пользователей или их тип не соответствует ожидаемому.
         """
-        base_serv = BaseCRUDService(db_session, Users)
-        for user_data in users_data:
-            base_serv.create(**user_data)
-
-        db_session.flush()
+        base_serv = _create_users(db_session, users_data)
 
         users = base_serv.read()
 
         assert len(users) == expected_count
-        assert all(isinstance(user, Users) for user in users)
+
+        for user_data, user in zip(users_data, users):
+            actual_data = {field: getattr(user, field) for field in user_data}
+            assert user_data == actual_data
 
     @pytest.mark.parametrize("users_data, filter_field, expected_count", parametrize_filter_single_field)
     def test_with_filter_single_field(self, db_session, users_data, filter_field, expected_count):
@@ -135,11 +146,7 @@ class TestUsersCRUDRead:
         :param filter_field: Фильтр для выборки записей.
         :param expected_count: Ожидаемое количество записей после применения фильтра.
         """
-        base_serv = BaseCRUDService(db_session, Users)
-        for user_data in users_data:
-            base_serv.create(**user_data)
-
-        db_session.flush()
+        base_serv = _create_users(db_session, users_data)
 
         filters = [getattr(Users, key) == value for key, value in filter_field.items()]
 
@@ -157,15 +164,11 @@ class TestUsersCRUDRead:
 
     @pytest.mark.parametrize("users_data, filter_field, expected_count", parametrize_with_filter_multiple_fields)
     def test_with_filter_multiple_fields(self, db_session, users_data, filter_field, expected_count):
-        base_serv = BaseCRUDService(db_session, Users)
-        for user_data in users_data:
-            base_serv.create(**user_data)
+        base_serv = _create_users(db_session, users_data)
 
-        db_session.flush()
+        filters = [getattr(Users, key) == value for key, value in filter_field.items() if hasattr(Users, key)]
+        users = list() if not filters else base_serv.read(filters=filters)
 
-        filters = [getattr(Users, key) == value for key, value in filter_field.items()]
-
-        users = base_serv.read(filters=filters)
         assert len(users) == expected_count, f"Ожидалось {expected_count} записей, получено {len(users)}"
 
         if expected_count == 0:
@@ -177,26 +180,88 @@ class TestUsersCRUDRead:
             for key, value in filter_field.items():
                 assert getattr(user, key) == value, f"Значение {key} в {user} не совпадает с {value}"
 
-    def test_with_sorted_single_field(self, db_session):
-        pass
+    @pytest.mark.parametrize("users_data,  expected_order", parametrize_with_sorted_single_field)
+    def test_with_sorted_single_field(self, db_session, users_data, expected_order):
+        """
+        Тестирует сортировку записей пользователей по отдельным полям в порядке возрастания и убывания.
 
-    def test_with_sorted_any_field(self, db_session):
-        pass
+        :param db_session: Сессия базы данных для выполнения операций.
+        :param users_data: Данные пользователей для создания записей в базе данных.
+        :param expected_order: Ожидаемый порядок пользователей после сортировки.
+        """
+        base_serv = _create_users(db_session, users_data)
 
-    def test_with_limit(self, db_session):
-        pass
+        # Сортировка по полю  nickname (ASC/DESC)
+        print(type(Users.nickname), 11111)
+        users = base_serv.read(order_by=Users.nickname)
+        assert [user.nickname for user in users] == list(expected_order)
+        users = base_serv.read(order_by=Users.nickname.desc())
+        assert [user.nickname for user in users] == list(expected_order)[::-1]
 
-    def test_with_offset(self, db_session):
-        pass
+        # Сортировка по полю  name (ASC/DESC)
+        users = base_serv.read(order_by=Users.name)
+        assert [user.name for user in users] == list(expected_order)
+        users = base_serv.read(order_by=Users.name.desc())
+        assert [user.name for user in users] == list(expected_order)[::-1]
 
-    def test_with_filter_sorted_limit(self, db_session):
-        pass
+        # Сортировка по полю  surname (ASC/DESC)
+        users = base_serv.read(order_by=Users.surname)
+        assert [user.surname for user in users] == list(expected_order)
+        users = base_serv.read(order_by=Users.surname.desc())
+        assert [user.surname for user in users] == list(expected_order)[::-1]
 
-    def test_empty_table(self):
-        pass
+    @pytest.mark.parametrize("users_data, sorting_rules", parametrize_sorting_by_multiple_fields)
+    def test_sorting_by_multiple_fields(self, db_session, users_data, sorting_rules):
+        base_serv = _create_users(db_session, users_data)
 
-    def test_filter_not_found(self):
-        pass
+        for sort_direction, field_combinations in sorting_rules.items():
+            for fields in field_combinations:
+                try:
+                    order_by = [(asc if sort_direction == "asc" else desc)(getattr(Users, field)) for field in fields]
+                except AttributeError as ex:
+                    pytest.fail(f"Ошибка доступа к полю {ex}")
 
-    def test_read_filter_no_results(self):
-        pass
+                expected_users = db_session.query(Users).order_by(*order_by).all()
+                users = base_serv.read(order_by=order_by)
+
+                assert [
+                           tuple(getattr(user, field) for field in fields) for user in expected_users
+                       ] == [
+                           tuple(getattr(user, field) for field in fields) for user in users
+                       ], f"Ошибка при сортировке по {fields} в порядке {sort_direction}"
+
+    @pytest.mark.parametrize("users_data", parametrize_create_valid)
+    def test_with_limit(self, db_session, users_data):
+        base_serv = _create_users(db_session, users_data)
+        max_limit = len(users_data)
+        for limit in range(1, max_limit):
+            expected_users = db_session.query(Users).limit(limit).all()
+            users = base_serv.read(order_by=Users.id, limit=limit)
+            assert len(expected_users) == len(users)
+            assert [expected_users.id for expected_users in users] == [user.id for user in users]
+
+    @pytest.mark.parametrize("users_data", parametrize_create_valid)
+    def test_with_offset(self, db_session, users_data):
+        base_serv = _create_users(db_session, users_data)
+        total_count = db_session.query(Users).count()
+        for offset in range(total_count + 1):
+            expected_users = db_session.query(Users).order_by(Users.id).offset(offset).all()
+            users = base_serv.read(order_by=Users.id, offset=offset)
+            assert len(expected_users) == len(users)
+            assert [user.id for user in expected_users] == [user.id for user in users]
+
+    @pytest.mark.parametrize("users_data, test_cases", parametrize_with_filter_sorted_limit)
+    def test_with_filter_sorted_limit(self, db_session, users_data, test_cases):
+        base_serve = _create_users(db_session, users_data)
+        for test_case in test_cases:
+            query_params, expected_users = test_case
+            users = base_serve.read(
+                filters=[getattr(Users, field) == value for field, value in query_params["filter"].items()],
+                order_by=query_params["order_by"],
+                limit=query_params["limit"])
+
+            assert len(users) == len(expected_users)
+            for user, expected_user in zip(users, expected_users):
+                assert user.nickname == expected_user["nickname"]
+                assert user.name == expected_user["name"]
+                assert user.surname == expected_user["surname"]
